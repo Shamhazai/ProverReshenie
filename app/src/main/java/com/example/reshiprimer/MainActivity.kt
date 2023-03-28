@@ -2,6 +2,7 @@ package com.example.reshiprimer
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.os.SystemClock
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -17,9 +18,18 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         val constraintLayout: ConstraintLayout = findViewById(R.id.constraintLayout)
-        val textViewError: TextView = findViewById(R.id.textViewError)
         val startButton: Button = findViewById(R.id.startButton)
-        val changeButton: Button = findViewById(R.id.searchButton)
+        val trueButton: Button = findViewById(R.id.trueButton)
+        val falseButton: Button = findViewById(R.id.falseButton)
+        var startTime = SystemClock.elapsedRealtime()
+        var minTimeLabel: TextView = findViewById(R.id.textViewMinNum)
+        var maxTimeLabel: TextView = findViewById(R.id.textViewMaxNum)
+        var avgTimeLabel: TextView = findViewById(R.id.textViewAvgNum)
+
+        var minTime: Float = 0f
+        var maxTime: Float = 0f
+        var sumTime: Float = 0f
+
         val firstNum: TextView = findViewById(R.id.firstNum)
         val operationLabel: TextView = findViewById(R.id.operationLabel)
         val secondNum: TextView = findViewById(R.id.secondNum)
@@ -32,9 +42,33 @@ class MainActivity : AppCompatActivity() {
         var correctInt = 0
         var wrongInt = 0
         val operations: List<String> = listOf("+", "-", "/", "*")
-        changeButton.isEnabled = false
-        textViewError.isVisible = false
+        trueButton.isEnabled = false
+        falseButton.isEnabled = false
+
         result.isEnabled = false
+
+
+        fun getTrueResult(): Int {
+            return when (operationLabel.text) {
+                "+" -> {
+                    (firstNum.text.toString().toInt() + secondNum.text.toString()
+                        .toInt())
+                }
+                "-" -> {
+                    (firstNum.text.toString().toInt() - secondNum.text.toString()
+                        .toInt())
+                }
+                "/" -> {
+                    (firstNum.text.toString().toInt() / secondNum.text.toString()
+                        .toInt())
+                }
+                "*" -> {
+                    (firstNum.text.toString().toInt() * secondNum.text.toString()
+                        .toInt())
+                }
+                else -> 0
+            }
+        }
 
         fun genRandomPrimer() {
             result.text = ""
@@ -49,32 +83,22 @@ class MainActivity : AppCompatActivity() {
             }
             firstNum.text = first.toString()
             secondNum.text = second.toString()
-        }
 
-        fun checkPrimer(): Boolean {
-            return when (operationLabel.text) {
-                "+" -> {
-                    (firstNum.text.toString().toInt() + secondNum.text.toString()
-                            .toInt()) == result.text.toString().toInt()
+            // с вероятностью 50 процентов либо генерим правильный ответ, либо случайный неправильный
+            val trueResult = Random.nextBoolean()
+            if (trueResult) {
+                result.text = getTrueResult().toString()
+            } else {
+                var resultNum = rnd.nextInt(10, 1000)
+                while (resultNum == getTrueResult()) {
+                    resultNum = rnd.nextInt(10, 1000)
                 }
-                "-" -> {
-                    (firstNum.text.toString().toInt() - secondNum.text.toString()
-                            .toInt()) == result.text.toString().toInt()
-                }
-                "/" -> {
-                    (firstNum.text.toString().toInt() / secondNum.text.toString()
-                            .toInt()) == result.text.toString().toInt()
-                }
-                "*" -> {
-                    (firstNum.text.toString().toInt() * secondNum.text.toString()
-                            .toInt()) == result.text.toString().toInt()
-                }
-                else -> false
+                result.text = resultNum.toString()
             }
         }
 
-        fun checkInputCorrectness(value: String): Boolean {
-            return value.toIntOrNull() != null
+        fun checkPrimer(): Boolean {
+            return getTrueResult() == result.text.toString().toInt()
         }
 
         // Событие по нажатии на "Старт"
@@ -82,50 +106,69 @@ class MainActivity : AppCompatActivity() {
         {
             startButton.isEnabled = false
             constraintLayout.setBackgroundResource(R.color.white);
-            textViewError.isVisible = false
-
-            result.isEnabled = true
-            changeButton.isEnabled = true
+            trueButton.isEnabled = true
+            falseButton.isEnabled = true
+            startTime = SystemClock.elapsedRealtime()
             result.text = ""
             genRandomPrimer()
         }
 
-        // Включаем кнопку "Проверка" когда введен какой-то текст
-        result.addTextChangedListener()
-        {
-            changeButton.isEnabled = !result.text.isNullOrBlank()
+        fun updateTimes(decisionTime: Float, totalCount: Int) {
+            if (decisionTime < minTime || minTime == 0f) {
+                minTime = decisionTime
+                minTimeLabel.text = "%.2f".format(minTime)
+            }
+
+            if (decisionTime > maxTime) {
+                maxTime = decisionTime
+                maxTimeLabel.text = "%.2f".format(maxTime)
+            }
+
+            sumTime += decisionTime
+            avgTimeLabel.text = "%.2f".format(sumTime / totalCount)
         }
 
-        // Событие по нажатии на кнопку "Проверка"
-        changeButton.setOnClickListener()
-        {
-            textViewError.isVisible = false
-            if (checkInputCorrectness(result.text.toString())) {
-                if (checkPrimer()) {
-                    // правильное решение
-                    correctInt++
-                    correctLabel.text = correctInt.toString()
-                    constraintLayout.setBackgroundResource(R.color.green);
-                } else {
-                    // неправильное решение
-                    wrongInt++
-                    wrongLabel.text = wrongInt.toString()
-                    constraintLayout.setBackgroundResource(R.color.red);
-                }
-                totalLabel.text = (correctInt + wrongInt).toString()
+        // проверяет, правильную ли кнопку (Верно/Неверно) тыкнул пользователь
+        fun checkCorrectChoice(choice: Boolean) {
+            val decisionTime = (SystemClock.elapsedRealtime() - startTime) / 1000f
 
-                percentLabel.text = (
-                        (((correctInt.toDouble() / (totalLabel.text.toString().toDouble() / 100.0)) * 100).roundToInt().toDouble() / 100
-                    ).toString()
-                    + "%")
-                result.isEnabled = false
-                changeButton.isEnabled = false
-                startButton.isEnabled = true
+            if ((checkPrimer() && choice) || (!checkPrimer() && !choice)) {
+                // правильное решение
+                correctInt++
+                correctLabel.text = correctInt.toString()
+                constraintLayout.setBackgroundResource(R.color.green);
             } else {
-                // некорректный ввод
-                textViewError.isVisible = true
+                // неправильное решение
+                wrongInt++
+                wrongLabel.text = wrongInt.toString()
+                constraintLayout.setBackgroundResource(R.color.red);
+            }
+            totalLabel.text = (correctInt + wrongInt).toString()
+
+            percentLabel.text = (
+                    (((correctInt.toDouble() / (totalLabel.text.toString().toDouble() / 100.0)) * 100).roundToInt().toDouble() / 100
+                            ).toString()
+                            + "%")
+            result.isEnabled = false
+            trueButton.isEnabled = false
+            falseButton.isEnabled = false
+            startButton.isEnabled = true
+
+            if (totalLabel.text.toString().toInt() != 0) {
+                updateTimes(decisionTime, totalLabel.text.toString().toInt())
             }
         }
 
+        // Событие по нажатии на кнопку "Верно"
+        trueButton.setOnClickListener()
+        {
+            checkCorrectChoice(true);
+        }
+
+        // Событие по нажатии на кнопку "Неверно"
+        falseButton.setOnClickListener()
+        {
+            checkCorrectChoice(false);
+        }
     }
 }
